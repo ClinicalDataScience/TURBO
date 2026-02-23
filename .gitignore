@@ -1,0 +1,15 @@
+# Environment files
+code/agent-api/.env
+.env
+
+# Logs
+code/agent-api/logs/
+code/agent-api/data/*.log
+
+# Editor backup files
+*~
+
+# Docker volumes — Milvus/etcd/minio regenerated at runtime
+code/volumes/milvus/
+code/volumes/etcd/
+code/volumes/minio/

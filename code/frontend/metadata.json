@@ -1,0 +1,5 @@
+{
+  "name": "TURBO - Tumor Board Preparation",
+  "description": "A clinician-centric dashboard for tumor board preparation, visualizing oncology patient histories and interacting with clinical data using AI-assisted analysis.",
+  "requestFramePermissions": []
+}

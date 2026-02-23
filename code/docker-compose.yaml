@@ -1,0 +1,193 @@
+services:
+  # Milvus dependencies
+  etcd:
+    container_name: milvus-etcd
+    image: quay.io/coreos/etcd:v3.5.25
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    command: etcd -advertise-client-urls=http://etcd:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    networks:
+      - milvus
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  minio:
+    container_name: milvus-minio
+    image: minio/minio:RELEASE.2024-05-28T17-19-04Z
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    ports:
+      - "9001:9001"
+      - "9000:9000"
+    command: minio server /minio_data --console-address ":9001"
+    networks:
+      - milvus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  milvus:
+    container_name: milvus-standalone
+    image: milvusdb/milvus:v2.6.9
+    command: ["milvus", "run", "standalone"]
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      MINIO_REGION: us-east-1
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+    networks:
+      - milvus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 30s
+      start_period: 90s
+      timeout: 20s
+      retries: 3
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    depends_on:
+      - etcd
+      - minio
+
+  # Agent API
+  agent-api:
+    build: ./agent-api
+    container_name: agent-api
+    network_mode: host
+    ports:
+      - 8000:8000
+    env_file:
+      - ./agent-api/.env
+    volumes:
+      - ./agent-api/data:/app/data
+      - ../data/nsclc_guideline.md:/app/data/nsclc_guideline.md:ro
+      - ../data/sclc_guideline.md:/app/data/sclc_guideline.md:ro
+    depends_on:
+      milvus:
+        condition: service_healthy
+    restart: unless-stopped
+
+
+  # FHIR Server
+  r4:
+    container_name: hapi-r4
+    image: ${R4_IMAGE}
+    environment:
+      - PORT=${R4_PORT}
+      - HOST=${HOST}
+    ports:
+      - "${R4_PORT}:8080"
+    volumes:
+      - "${DOCKER_VOLUME_DIRECTORY:-.}/volumes/hapi-fhir:/data/hapi-seed:ro"
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+
+        envsubst < /tmp/hapi.properties.tpl > /config/hapi.properties
+        envsubst < /tmp/server.xml > /usr/local/tomcat/conf/server.xml
+
+        # Copy pre-populated database from immutable seed volume
+        mkdir -p /usr/local/tomcat/target/database
+        cp /data/hapi-seed/h2.mv.db /usr/local/tomcat/target/database/h2.mv.db
+
+        catalina.sh run &
+
+        echo "Waiting for FHIR Server to be ready..."
+        until curl -fsS "http://localhost:8080/hapi-fhir-jpaserver/fhir/metadata" >/dev/null 2>&1; do
+          sleep 2
+        done
+        echo "FHIR Server is ready (pre-populated database loaded)."
+
+        wait
+    networks:
+      - milvus
+    deploy:
+      resources:
+        limits:
+          cpus: "${R4_CPU_CORES}"
+          memory: ${R4_MEMORY}
+      replicas: ${R4_ENABLED}
+
+  fhir-viewer:
+    container_name: fhir-viewer
+    image: smartonfhir/fhir-viewer
+    ports:
+      - "${FHIR_VIEWER_PORT}:80"
+    networks:
+      - milvus
+    deploy:
+      replicas: ${FHIR_VIEWER_ENABLED}
+
+  patient-browser:
+    container_name: patient-browser
+    image: smartonfhir/patient-browser:latest
+    volumes:
+      - ./patient-browser/config.json:/usr/share/nginx/html/config/default.json5:ro
+    environment:
+      - HOST=${HOST}
+      - FHIR_VIEWER_PORT=${FHIR_VIEWER_PORT}
+      - R2_PORT=${R2_PORT}
+      - R3_PORT=${R3_PORT}
+      - R4_PORT=${R4_PORT}
+    ports:
+      - "${PATIENT_BROWSER_PORT}:80"
+    command:
+      - /bin/sh
+      - -c
+      - |
+        envsubst < /usr/share/nginx/html/config/r2.tpl > /usr/share/nginx/html/config/r2-local.json5
+        envsubst < /usr/share/nginx/html/config/r3.tpl > /usr/share/nginx/html/config/r3-local.json5
+        envsubst < /usr/share/nginx/html/config/r4.tpl > /usr/share/nginx/html/config/r4-local.json5
+        nginx -g 'daemon off;'
+    networks:
+      - milvus
+    deploy:
+      replicas: ${PATIENT_BROWSER_ENABLED}
+
+  fhir-mcp-server:
+    image: docker.io/wso2/fhir-mcp-server:latest
+    container_name: fhir-mcp-server
+    environment:
+      FHIR_SERVER_BASE_URL: http://hapi-r4:8080/hapi-fhir-jpaserver/fhir/
+      FHIR_MCP_HOST: 0.0.0.0
+      FHIR_MCP_PORT: "4003"
+      FHIR_MCP_REQUEST_TIMEOUT: "30"
+      FHIR_SERVER_DISABLE_AUTHORIZATION: True
+    ports:
+      - "${MCPFHIR_PORT}:4003"
+    networks:
+      - milvus
+    deploy:
+      replicas: ${MCPFHIR_ENABLED}
+
+  # Frontend (React/Vite)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: medgemma-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    networks:
+      - milvus
+    depends_on:
+      - agent-api
+
+networks:
+  milvus:
+    name: milvus
