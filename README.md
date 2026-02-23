@@ -1,4 +1,5 @@
-# CDS X MedGemma
+# TURBO - Tumor Board Assistant
+
 This is the contribution of the CDS team to the MedGemma Impact Challenge 2026.
 
 **Team:** Team of Clinical Data Science Group, Clinic for Radiology at Ludwig-Maximilians-Universität München (LMU)
