@@ -29,6 +29,17 @@ logger = logging.getLogger("medgemma-agent")
 router = APIRouter(tags=["patients"])
 
 
+def _get_current_fhir_hash(patient_id: str) -> str | None:
+    """Return the current FHIR data hash for a patient, or None."""
+    conn = get_db_connection()
+    row = conn.execute(
+        "SELECT fhir_data_hash FROM patient_hashes WHERE patient_id = ?",
+        (patient_id,),
+    ).fetchone()
+    conn.close()
+    return row[0] if row else None
+
+
 # ---------------------------------------------------------------------------
 # POST /start_generation
 # ---------------------------------------------------------------------------
@@ -55,17 +66,25 @@ async def start_generation(request: StartGenerationRequest):
         conn.row_factory = sqlite3.Row
         if clinical_question:
             cached = conn.execute(
-                "SELECT id FROM summaries WHERE patient_id = ? AND fragestellung = ? LIMIT 1",
+                "SELECT id, fhir_data_hash FROM summaries WHERE patient_id = ? AND fragestellung = ? ORDER BY created_at DESC LIMIT 1",
                 (patient_id, clinical_question),
             ).fetchone()
         else:
             cached = conn.execute(
-                "SELECT id FROM summaries WHERE patient_id = ? AND fragestellung IS NULL LIMIT 1",
+                "SELECT id, fhir_data_hash FROM summaries WHERE patient_id = ? AND fragestellung IS NULL ORDER BY created_at DESC LIMIT 1",
                 (patient_id,),
             ).fetchone()
         conn.close()
         if cached:
-            return {"status": "cached"}
+            current_hash = _get_current_fhir_hash(patient_id)
+            cached_hash = cached["fhir_data_hash"]
+            if current_hash and cached_hash and current_hash != cached_hash:
+                logger.info(
+                    "start_generation: stale cache for patient %s (hash %s→%s), regenerating",
+                    patient_id, cached_hash[:8], current_hash[:8],
+                )
+            else:
+                return {"status": "cached"}
 
     # Clear stale progress and insert initial row so polling never sees "not_started"
     try:
@@ -232,22 +251,31 @@ async def get_summary(
             conn.close()
 
             if cached and cached["summary"]:
-                logger.info("Returning cached summary for patient %s", patient_id)
-                # Mark any in-progress generation as complete
-                try:
-                    conn = get_db_connection()
-                    conn.execute("""
-                        UPDATE generation_progress
-                        SET completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-                        WHERE patient_id = ? AND COALESCE(clinical_question, '') = COALESCE(?, '')
-                        AND completed_at IS NULL
-                    """, (patient_id, effective_clinical_question or ''))
-                    conn.commit()
-                    conn.close()
-                except Exception as e:
-                    logger.warning("Failed to mark cached summary progress as complete: %s", e)
+                # Invalidate cache when FHIR data has changed since the summary was generated
+                current_hash = _get_current_fhir_hash(patient_id)
+                cached_hash = cached["fhir_data_hash"]
+                if current_hash and cached_hash and current_hash != cached_hash:
+                    logger.info(
+                        "Cached summary for patient %s is stale (hash %s→%s), regenerating",
+                        patient_id, cached_hash[:8], current_hash[:8],
+                    )
+                else:
+                    logger.info("Returning cached summary for patient %s", patient_id)
+                    # Mark any in-progress generation as complete
+                    try:
+                        conn = get_db_connection()
+                        conn.execute("""
+                            UPDATE generation_progress
+                            SET completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                            WHERE patient_id = ? AND COALESCE(clinical_question, '') = COALESCE(?, '')
+                            AND completed_at IS NULL
+                        """, (patient_id, effective_clinical_question or ''))
+                        conn.commit()
+                        conn.close()
+                    except Exception as e:
+                        logger.warning("Failed to mark cached summary progress as complete: %s", e)
 
-                return SummaryResponse(**json.loads(cached["summary"]))
+                    return SummaryResponse(**json.loads(cached["summary"]))
 
         # Generate fresh summary
         result = await generate_summary_with_llm(
@@ -335,24 +363,35 @@ async def get_summary_stream(
                 conn.close()
 
                 if cached and cached["summary"]:
-                    logger.info("Returning cached summary for patient %s", patient_id)
-                    # Mark any in-progress generation as complete
-                    try:
-                        conn = get_db_connection()
-                        conn.execute("""
-                            UPDATE generation_progress
-                            SET completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-                            WHERE patient_id = ? AND COALESCE(clinical_question, '') = COALESCE(?, '')
-                            AND completed_at IS NULL
-                        """, (patient_id, effective_clinical_question or ''))
-                        conn.commit()
-                        conn.close()
-                    except Exception as e:
-                        logger.warning("Failed to mark cached summary progress as complete: %s", e)
+                    # Invalidate cache when FHIR data has changed since the summary was generated
+                    current_hash = _get_current_fhir_hash(patient_id)
+                    cached_hash = cached["fhir_data_hash"]
+                    cache_is_fresh = not (current_hash and cached_hash and current_hash != cached_hash)
 
-                    summary = SummaryResponse(**json.loads(cached["summary"]))
-                    yield _sse({"type": "complete", "summary": summary.dict()})
-                    return
+                    if cache_is_fresh:
+                        logger.info("Returning cached summary for patient %s", patient_id)
+                        # Mark any in-progress generation as complete
+                        try:
+                            conn = get_db_connection()
+                            conn.execute("""
+                                UPDATE generation_progress
+                                SET completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                                WHERE patient_id = ? AND COALESCE(clinical_question, '') = COALESCE(?, '')
+                                AND completed_at IS NULL
+                            """, (patient_id, effective_clinical_question or ''))
+                            conn.commit()
+                            conn.close()
+                        except Exception as e:
+                            logger.warning("Failed to mark cached summary progress as complete: %s", e)
+
+                        summary = SummaryResponse(**json.loads(cached["summary"]))
+                        yield _sse({"type": "complete", "summary": summary.dict()})
+                        return
+                    else:
+                        logger.info(
+                            "Cached summary for patient %s is stale (hash %s→%s), regenerating",
+                            patient_id, cached_hash[:8], current_hash[:8],
+                        )
 
             yield _sse({"type": "status", "message": "Fetching patient data..."})
 
