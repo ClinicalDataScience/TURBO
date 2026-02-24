@@ -4,7 +4,13 @@ This is the contribution of the CDS team to the MedGemma Impact Challenge 2026.
 
 **Team:** Clinical Data Science in Radiology, Department of Radiology, LMU University Hospital, LMU Munich
 
-[![TURBO - Tumor Board Assistant | CDS | Kaggle Submission - MedGemma Impact Challenge](https://img.youtube.com/vi/ZHto0XCb6ao/maxresdefault.jpg)](https://www.youtube.com/watch?v=ZHto0XCb6ao)
+<a href="https://www.youtube.com/watch?v=ZHto0XCb6ao">
+  <picture>
+    <img src="https://img.youtube.com/vi/ZHto0XCb6ao/hqdefault.jpg" alt="Watch the video" width="480">
+  </picture>
+</a>
+<br>
+▶️ <a href="https://www.youtube.com/watch?v=ZHto0XCb6ao">Watch the video</a>
 
 **License:** CC BY 4.0
 ## Quickstart
