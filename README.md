@@ -11,7 +11,7 @@ This is the contribution of the CDS team to the MedGemma Impact Challenge 2026.
    ```bash
    cp code/agent-api/.env.example code/agent-api/.env
    # Edit code/agent-api/.env — paste your API key as LLM_API_KEY and EMBEDDING_API_KEY
-   and your URL as LLM_BASE_URL and LLM_EMBEDDING_URL as well as your embedding model.
+   # and your URL as LLM_BASE_URL and LLM_EMBEDDING_URL as well as your embedding model.
    cd code
    docker compose build && docker compose up
    ```
