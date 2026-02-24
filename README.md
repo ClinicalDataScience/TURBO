@@ -2,7 +2,7 @@
 
 This is the contribution of the CDS team to the MedGemma Impact Challenge 2026.
 
-**Team:** Team of Clinical Data Science Group, Clinic for Radiology at Ludwig-Maximilians-Universität München (LMU)
+**Team:** Clinical Data Science in Radiology, Department of Radiology, LMU University Hospital, LMU Munich
 
 **License:** CC BY 4.0
 ## Quickstart
