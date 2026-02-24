@@ -1,6 +1,5 @@
 # Environment files
 code/agent-api/.env
-.env
 
 # Logs
 code/agent-api/logs/
