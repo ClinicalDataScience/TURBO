@@ -4,7 +4,7 @@ This is the contribution of the CDS team to the MedGemma Impact Challenge 2026.
 
 **Team:** Clinical Data Science in Radiology, Department of Radiology, LMU University Hospital, LMU Munich
 
-**Project Video:** [YouTube – TURBO Project](https://www.youtube.com/watch?v=ZHto0XCb6ao)
+**Project Video:** [YouTube - TURBO Project](https://www.youtube.com/watch?v=ZHto0XCb6ao)
 
 **License:** CC BY 4.0
 ## Quickstart
