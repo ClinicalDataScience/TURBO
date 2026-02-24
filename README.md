@@ -14,24 +14,21 @@ This is the contribution of the CDS team to the MedGemma Impact Challenge 2026.
 2. **Configure and start:**
    ```bash
    cp code/agent-api/.env.example code/agent-api/.env
-   # Edit code/agent-api/.env — paste your API key as LLM_API_KEY and EMBEDDING_API_KEY
-   # and your URL as LLM_BASE_URL and LLM_EMBEDDING_URL as well as your embedding model.
+    ```
+   Edit code/agent-api/.env — paste your API key as LLM_API_KEY and EMBEDDING_API_KEY and your URL as LLM_BASE_URL and LLM_EMBEDDING_URL as well as your embedding model.
+   ```bash
    cd code
    docker compose build && docker compose up
    ```
-3. **Open the app** at [http://localhost:3000](http://localhost:3000) after the application startup has completed.
+4. **Open the app** at [http://localhost:3000](http://localhost:3000) after the application startup has completed.
 
-### Project name 
-
-**TURBO - TUmoR BOard assistant**
-
-### Team
+## Team
 At the Clinical Data Science Group in the Department of Radiology at LMU Hospital Munich, we have built what our clinicians had long been wishing for: a more innovative, faster way to prepare and run tumor boards. In a few intense hackathon weeks, together with practicing physicians and hospital IT engineers, we developed TURBO. This MedGemma-based agentic tumor board assistant mirrors real-world workflows and aligns with institutional governance requirements.
 - Clinical Data Science, Radiology: Prof. Dr. Michael Ingrisch, Jakob Dexl, David Götzinger, Dr. Katharina Jeblick, Anna Theresa Stüber, Johanna Topalis, Rachelle Trotman, Beatrice Villata
 - Hospital IT: Gabriel Lindner, Stefan Reifberger, Dr. Balthasar Schachtner
 - Clinical advisors: Prof. Dr. Bastian Sabel (Senior Radiologist), Prof. Dr. Amanda Tufman (Senior Specialist in Thoracic Oncology)
 
-### Problem statement
+## Problem statement
 Multidisciplinary tumor boards are a central decision-making structure in oncology. For each case, clinicians must reconstruct a longitudinal narrative from radiology reports, pathology, prior therapies, comorbidities, and current oncological guideline recommendations to define the best possible treatment plan. Although these data are available digitally, they are fragmented across heterogeneous hospital systems and are stored mainly as unstructured text.
 Preparation is therefore manual, time-intensive, and cognitively demanding. Physicians retrieve documents from multiple sources, assess their clinical relevance, integrate findings across time, and synthesize a coherent summary under time pressure. At German university hospitals, tumor board preparation and participation can exceed 142 min, including 53 min preparation per tumor board per week [1]. 
 This manual workflow has two consequences: reduced time for patient-facing care and an increased risk that relevant longitudinal details will be overlooked in complex cases. As oncology becomes more data-rich, this burden will intensify.
@@ -40,7 +37,7 @@ Tumor board preparation is well-suited for domain-specific foundation models. It
 
 We are not alone in seeing this potential. A major pharmaceutical company has invested heavily in digitizing tumor board workflows, most recently testing LLM-based summarization on its commercial platform [2]. Potential time and financial gains are substantial. Our senior physician estimated a 50% reduction in preparation time, consistent with the company's claims of a 40–50% reduction [3]. For a per-case preparation time between 4 min [1] and 30 min [3], a 50% reduction translates to €36K–€270K per university hospital, assuming €100/hr physician cost (16.7 boards/week × 13.5 cases/board × 48 weeks = ~10,800 cases/yr [1]). With roughly 20 million new cancer cases annually [4] and tumor boards held in most high-income countries [5], we conservatively estimate 10M tumor board preparations per year worldwide, translating to €40M–€300M globally. These numbers are expected to rise significantly, as cancer incidence is projected to reach 35 million cases annually by 2050 [4]. 
 
-### Overall Solution
+## Overall Solution
 This is why we have developed TURBO, an agentic, on-premise tumor board assistant built around MedGemma as its clinical reasoning engine. While maintaining complete human oversight, the system streamlines tumor board case preparation and discussion by transforming fragmented patient records into structured, verifiable, and discussion-ready case summaries and enabling case-specific follow-up questions via an integrated agentic chatbot.
 
 The solution comprises three integrated components:
@@ -62,7 +59,7 @@ The solution comprises three integrated components:
 
 For all components, MedGemma is essential because the task requires domain-specific language understanding and long-context reasoning, as well as secure on-premise deployment. Its medical pre-training and open-weight architecture enable clinically grounded reasoning within hospital infrastructures. This makes TURBO a deployable workflow solution rather than a standalone AI demonstration.
 
-### Technical details
+## Technical details
 TURBO is implemented as a modular, self-hostable architecture.
 
 **System architecture:**
@@ -90,7 +87,7 @@ All model outputs are explicitly source-referenced to ensure transparency and ve
 **Feasibility and next steps**
 The stack is fully self-hostable and aligned with hospital data governance constraints. The current MVP runs on a preconfigured FHIR server with synthetic data in Docker Compose. Next steps include prospective measurement of time savings against manual preparation, quantitative evaluation of summary completeness and citation accuracy, systematic assessment of hallucination rates across case complexity levels, and reliability hardening for routine clinical use.
 
-### References 
+## References 
 
 [1] Schreyer AG et al. Interdisziplinäre Tumorkonferenzen in der radiologischen Routine. Der Radiologe 2020;60:737–746.
 
